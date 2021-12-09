@@ -48,7 +48,7 @@ namespace goes
             int sat_number = images.sat_number;
             int vis_width = images.vis_width;
 
-            std::string dir_name = "GOES-" + std::to_string(sat_number) + "/" + timestamp;
+            std::string dir_name = "GOES-" + std::to_string(sat_number) + "/" ;//+ timestamp;
             logger->info("Full disk finished, saving at " + dir_name + "...");
 
             std::filesystem::create_directories(directory + "/" + dir_name);
@@ -97,19 +97,19 @@ namespace goes
             images.image4.crop(0, 0, ir1_width - 1, ir1_height - 1);
 
             logger->info("Channel 1... " + getGvarFilename(sat_number, timeReadable, "1") + ".png");
-            images.image5.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "1") + ".png").c_str());
+            images.image5.save_png(std::string(disk_folder + "/1/" + getGvarFilename(sat_number, timeReadable, "1") + ".png").c_str());
 
             logger->info("Channel 2... " + getGvarFilename(sat_number, timeReadable, "2") + ".png");
-            images.image1.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "2") + ".png").c_str());
+            images.image1.save_png(std::string(disk_folder + "/2/" + getGvarFilename(sat_number, timeReadable, "2") + ".png").c_str());
 
             logger->info("Channel 3... " + getGvarFilename(sat_number, timeReadable, "3") + ".png");
-            images.image2.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "3") + ".png").c_str());
+            images.image2.save_png(std::string(disk_folder + "/3/" + getGvarFilename(sat_number, timeReadable, "3") + ".png").c_str());
 
             logger->info("Channel 4... " + getGvarFilename(sat_number, timeReadable, "4") + ".png");
-            images.image3.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "4") + ".png").c_str());
+            images.image3.save_png(std::string(disk_folder + "/4/" + getGvarFilename(sat_number, timeReadable, "4") + ".png").c_str());
 
             logger->info("Channel 5... " + getGvarFilename(sat_number, timeReadable, "5") + ".png");
-            images.image4.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "5") + ".png").c_str());
+            images.image4.save_png(std::string(disk_folder + "/5/" + getGvarFilename(sat_number, timeReadable, "5") + ".png").c_str());
 
             // Let plugins do something
             satdump::eventBus->fire_event<events::GVARSaveChannelImagesEvent>({images, timeReadable, timevalue, disk_folder});
