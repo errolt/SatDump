@@ -69,7 +69,7 @@ namespace tcp
                 input_fifo->read((uint8_t *)buffer, frame_size);
 
 #ifndef __ANDROID__
-            nng_send(sock, &buffer[4], 892, NNG_FLAG_NONBLOCK);
+            nng_send(sock, &buffer[0], frame_size, NNG_FLAG_NONBLOCK);
 #endif
 
             if (input_data_type == DATA_FILE)

@@ -114,12 +114,14 @@ namespace goes
                 }
 
                 if (input_data_type == DATA_FILE)
+                {
                     progress = data_in.tellg();
 
-                if (time(NULL) % 10 == 0 && lastTime != time(NULL))
-                {
-                    lastTime = time(NULL);
-                    logger->info("Progress " + std::to_string(round(((float)progress / (float)filesize) * 1000.0f) / 10.0f) + "%");
+                    if (time(NULL) % 10 == 0 && lastTime != time(NULL))
+                    {
+                        lastTime = time(NULL);
+                        logger->info("Progress " + std::to_string(round(((float)progress / (float)filesize) * 1000.0f) / 10.0f) + "%");
+                    }
                 }
             }
 
