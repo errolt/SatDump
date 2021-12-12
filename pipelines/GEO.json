@@ -43,7 +43,7 @@
         }
     },
     "goes_gvar_tcp": {
-        "name": "GOES GVAR",
+        "name": "GOES GVAR TCP TX",
         "live": true,
         "live_cfg": [
             [
@@ -81,7 +81,8 @@
                 "goes_gvar_decoder": {}
             },
             "tcp": {
-                "xrit_goesrecv_publisher": {
+                "tcp_publisher": {
+                    "frame_size":32786,
                     "address": "0.0.0.0",
                     "port": 5004
                 }

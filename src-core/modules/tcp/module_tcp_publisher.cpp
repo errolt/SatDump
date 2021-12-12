@@ -1,4 +1,4 @@
-#include "module_gvar_publisher.h"
+#include "module_tcp_publisher.h"
 #include "logger.h"
 #include "imgui/imgui.h"
 #ifndef __ANDROID__
@@ -6,36 +6,37 @@
 #include <nng/protocol/pubsub0/pub.h>
 #endif
 
-#define FRAME_SIZE 1024
+//#define FRAME_SIZE 32786
 
 // Return filesize
 size_t getFilesize(std::string filepath);
 
-namespace gvar
+namespace tcp
 {
-    GOESRecvPublisherModule::GOESRecvPublisherModule(std::string input_file, std::string output_file_hint, nlohmann::json parameters) : ProcessingModule(input_file, output_file_hint, parameters),
+    TCPPublisherModule::TCPPublisherModule(std::string input_file, std::string output_file_hint, nlohmann::json parameters) : ProcessingModule(input_file, output_file_hint, parameters),
                                                                                                                                         address(parameters["address"].get<std::string>()),
-                                                                                                                                        port(parameters["port"].get<int>())
+                                                                                                                                        port(parameters["port"].get<int>()),
+                                                                                                                                        frame_size(parameters["frame_size"].get<int>())
     {
-        buffer = new uint8_t[FRAME_SIZE];
+        buffer = new uint8_t[frame_size];
     }
 
-    std::vector<ModuleDataType> GOESRecvPublisherModule::getInputTypes()
+    std::vector<ModuleDataType> TCPPublisherModule::getInputTypes()
     {
         return {DATA_FILE, DATA_STREAM};
     }
 
-    std::vector<ModuleDataType> GOESRecvPublisherModule::getOutputTypes()
+    std::vector<ModuleDataType> TCPPublisherModule::getOutputTypes()
     {
         return {DATA_FILE};
     }
 
-    GOESRecvPublisherModule::~GOESRecvPublisherModule()
+    TCPPublisherModule::~TCPPublisherModule()
     {
         delete[] buffer;
     }
 
-    void GOESRecvPublisherModule::process()
+    void TCPPublisherModule::process()
     {
         if (input_data_type == DATA_FILE)
             filesize = getFilesize(d_input_file);
@@ -63,21 +64,23 @@ namespace gvar
         {
             // Read a buffer
             if (input_data_type == DATA_FILE)
-                data_in.read((char *)buffer, FRAME_SIZE);
+                data_in.read((char *)buffer, frame_size);
             else
-                input_fifo->read((uint8_t *)buffer, FRAME_SIZE);
+                input_fifo->read((uint8_t *)buffer, frame_size);
 
 #ifndef __ANDROID__
             nng_send(sock, &buffer[4], 892, NNG_FLAG_NONBLOCK);
 #endif
 
             if (input_data_type == DATA_FILE)
+            {
                 progress = data_in.tellg();
 
-            if (time(NULL) % 10 == 0 && lastTime != time(NULL))
-            {
-                lastTime = time(NULL);
-                logger->info("Progress " + std::to_string(round(((float)progress / (float)filesize) * 1000.0f) / 10.0f) + "%");
+                if (time(NULL) % 10 == 0 && lastTime != time(NULL))
+                {
+                    lastTime = time(NULL);
+                    logger->info("Progress " + std::to_string(round(((float)progress / (float)filesize) * 1000.0f) / 10.0f) + "%");
+                }
             }
         }
 
@@ -89,9 +92,9 @@ namespace gvar
             data_in.close();
     }
 
-    void GOESRecvPublisherModule::drawUI(bool window)
+    void TCPPublisherModule::drawUI(bool window)
     {
-        ImGui::Begin("xRIT GOESRECV Publisher", NULL, window ? NULL : NOWINDOW_FLAGS);
+        ImGui::Begin("tcp Publisher", NULL, window ? NULL : NOWINDOW_FLAGS);
 
         ImGui::Text("Address  : ");
         ImGui::SameLine();
@@ -100,6 +103,10 @@ namespace gvar
         ImGui::Text("Port    : ");
         ImGui::SameLine();
         ImGui::TextColored(IMCOLOR_SYNCED, UITO_C_STR(port));
+
+        ImGui::Text("Frame size    : ");
+        ImGui::SameLine();
+        ImGui::TextColored(IMCOLOR_SYNCED, UITO_C_STR(frame_size));
 
 #ifdef __ANDROID__
         ImGui::TextColored(IMCOLOR_NOSYNC, "This module is not yet supported on Android due to nng compatibility issues.");
@@ -111,18 +118,18 @@ namespace gvar
         ImGui::End();
     }
 
-    std::string GOESRecvPublisherModule::getID()
+    std::string TCPPublisherModule::getID()
     {
-        return "xrit_goesrecv_publisher";
+        return "tcp_publisher";
     }
 
-    std::vector<std::string> GOESRecvPublisherModule::getParameters()
+    std::vector<std::string> TCPPublisherModule::getParameters()
     {
         return {"address", "port"};
     }
 
-    std::shared_ptr<ProcessingModule> GOESRecvPublisherModule::getInstance(std::string input_file, std::string output_file_hint, nlohmann::json parameters)
+    std::shared_ptr<ProcessingModule> TCPPublisherModule::getInstance(std::string input_file, std::string output_file_hint, nlohmann::json parameters)
     {
-        return std::make_shared<GOESRecvPublisherModule>(input_file, output_file_hint, parameters);
+        return std::make_shared<TCPPublisherModule>(input_file, output_file_hint, parameters);
     }
 }

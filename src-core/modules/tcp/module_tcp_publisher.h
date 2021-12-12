@@ -4,9 +4,9 @@
 #include <complex>
 #include <fstream>
 
-namespace gvar
+namespace tcp
 {
-    class GOESRecvPublisherModule : public ProcessingModule
+    class TCPPublisherModule : public ProcessingModule
     {
     protected:
         uint8_t *buffer;
@@ -17,14 +17,15 @@ namespace gvar
 
         std::string address;
         int port;
+        int frame_size;
 
         // UI Stuff
         float ber_history[200];
         float cor_history[200];
 
     public:
-        GOESRecvPublisherModule(std::string input_file, std::string output_file_hint, nlohmann::json parameters);
-        ~GOESRecvPublisherModule();
+        TCPPublisherModule(std::string input_file, std::string output_file_hint, nlohmann::json parameters);
+        ~TCPPublisherModule();
         void process();
         void drawUI(bool window);
         std::vector<ModuleDataType> getInputTypes();

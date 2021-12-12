@@ -180,6 +180,8 @@ SATDUMP_DLL std::map<std::string, std::function<std::shared_ptr<ProcessingModule
 #include "modules/cryosat/module_cryosat_dump_decoder.h"
 #include "modules/cryosat/instruments/siral/module_cryosat_siral.h"
 
+#include "modules/tcp/module_tcp_publisher.h"
+
 void registerModules()
 {
     // Register modules
@@ -336,6 +338,9 @@ void registerModules()
     // Plugin modules
     satdump::eventBus->fire_event<RegisterModulesEvent>({modules_registry});
 
+    // GENERIC
+    REGISTER_MODULE(tcp::TCPPublisherModule);
+    
     // Log them out
     logger->debug("Registered modules (" + std::to_string(modules_registry.size()) + ") : ");
     for (std::pair<const std::string, std::function<std::shared_ptr<ProcessingModule>(std::string, std::string, nlohmann::json)>> &it : modules_registry)
