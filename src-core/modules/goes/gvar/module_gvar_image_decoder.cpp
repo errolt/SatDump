@@ -104,14 +104,38 @@ namespace goes
             int ir1_width = vis_width / 4;
             int ir1_height = vis_height / 4;
 
-            logger->info("Cropping to transmited size...");
+            logger->info("Cropping to transmited size and centering...");
             logger->debug("VIS 1 size " + std::to_string(vis_width) + "x" + std::to_string(vis_height));
-            images.image5.crop(0, 0, vis_width, vis_height);
+            if(vis_width==20824)
+                images.image5.crop(0, 0, 18990, vis_height);
+            else if(vis_width==20836)
+                images.image5.crop(1852, 0, 18990, vis_height);
+            else
+                images.image5.crop(0, 0, vis_width, vis_height);
+
             logger->debug("IR size " + std::to_string(ir1_width) + "x" + std::to_string(ir1_height));
-            images.image1.crop(0, 0, ir1_width, ir1_height);
-            images.image2.crop(0, 0, ir1_width, ir1_height);
-            images.image3.crop(0, 0, ir1_width, ir1_height);
-            images.image4.crop(0, 0, ir1_width, ir1_height);
+            if(ir1_width==5206)
+            {
+                images.image1.crop(0, 0, 4749, ir1_height);
+                images.image2.crop(0, 0, 4749, ir1_height);
+                images.image3.crop(0, 0, 4749, ir1_height);
+                images.image4.crop(0, 0, 4749, ir1_height);
+            }
+            else if(ir1_width==5209)
+            {
+                images.image1.crop(463, 0, 4749, ir1_height);
+                images.image2.crop(463, 0, 4749, ir1_height);
+                images.image3.crop(463, 0, 4749, ir1_height);
+                images.image4.crop(463, 0, 4749, ir1_height);
+            }
+            else
+            {
+                images.image1.crop(0, 0, ir1_width, ir1_height);
+                images.image2.crop(0, 0, ir1_width, ir1_height);
+                images.image3.crop(0, 0, ir1_width, ir1_height);
+                images.image4.crop(0, 0, ir1_width, ir1_height);
+            }
+
 
             logger->info("Channel 1... " + getGvarFilename(sat_number, timeReadable, "1") + ".png");
             images.image5.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "1") + ".png").c_str());
