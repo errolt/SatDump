@@ -109,7 +109,7 @@ namespace goes
             if(vis_width==20824)
                 images.image5.crop(0, 0, 18990, vis_height);
             else if(vis_width==20836)
-                images.image5.crop(1852, 0, 18990, vis_height);
+                images.image5.crop(1852, 0, 20836, vis_height);
             else
                 images.image5.crop(0, 0, vis_width, vis_height);
 
@@ -123,10 +123,10 @@ namespace goes
             }
             else if(ir1_width==5209)
             {
-                images.image1.crop(463, 0, 4749, ir1_height);
-                images.image2.crop(463, 0, 4749, ir1_height);
-                images.image3.crop(463, 0, 4749, ir1_height);
-                images.image4.crop(463, 0, 4749, ir1_height);
+                images.image1.crop(463, 0, 5209, ir1_height);
+                images.image2.crop(463, 0, 5209, ir1_height);
+                images.image3.crop(463, 0, 5209, ir1_height);
+                images.image4.crop(463, 0, 5209, ir1_height);
             }
             else
             {
