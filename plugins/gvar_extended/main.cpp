@@ -46,10 +46,20 @@ private:
             }
         }
     }
-
+    static std::string getGvarFilename(int sat_number, std::tm *timeReadable, std::string channel)
+    {
+        std::string utc_filename = "G" + std::to_string(sat_number) + "_" + channel + "_" +                                                                     // Satellite name and channel
+                                    std::to_string(timeReadable->tm_year + 1900) +                                                                               // Year yyyy
+                                    (timeReadable->tm_mon + 1 > 9 ? std::to_string(timeReadable->tm_mon + 1) : "0" + std::to_string(timeReadable->tm_mon + 1)) + // Month MM
+                                    (timeReadable->tm_mday > 9 ? std::to_string(timeReadable->tm_mday) : "0" + std::to_string(timeReadable->tm_mday)) + "T" +    // Day dd
+                                    (timeReadable->tm_hour > 9 ? std::to_string(timeReadable->tm_hour) : "0" + std::to_string(timeReadable->tm_hour)) +          // Hour HH
+                                    (timeReadable->tm_min > 9 ? std::to_string(timeReadable->tm_min) : "0" + std::to_string(timeReadable->tm_min)) +             // Minutes mm
+                                    (timeReadable->tm_sec > 9 ? std::to_string(timeReadable->tm_sec) : "0" + std::to_string(timeReadable->tm_sec)) + "Z";        // Seconds ss
+        return utc_filename;
+    }
     static void gvarSaveChannelImagesHandler(const goes::gvar::events::GVARSaveChannelImagesEvent &evt)
     {
-        logger->info("Preview... preview.png");
+        logger->info("Preview... " + getGvarFilename(evt.images.sat_number, evt.timeReadable, "ALL") + ".png");
         image::Image<uint8_t> preview(1300, 948, 1);
         image::Image<uint8_t> previewImage;
 
@@ -127,7 +137,9 @@ private:
             offsetY = preview.width() * offsetYratio;
 
             previewImage = image::Image<uint8_t>(preview.width(), preview.height() + 2 * bar_height, 1);
-
+            imgtext = image::Image<uint8_t>(preview.width(), bar_height, 1);
+            imgtext1 = image::Image<uint8_t>(preview.width(), bar_height, 1);
+            imgtext2 = image::Image<uint8_t>(preview.width(), bar_height, 1);
             unsigned char color = 255;
 
             std::vector<image::Image<uint8_t>> font = image::make_font(text_size);
@@ -141,9 +153,10 @@ private:
             previewImage.draw_image(0, imgtext1, previewImage.width() - imgtext1.width() - offsetX, offsetY);
             previewImage.draw_image(0, imgtext2, offsetX, bar_height + preview.height() + offsetY);
             previewImage.draw_image(0, preview, 0, bar_height);
+
+            previewImage.save_png(std::string(evt.directory + "/"+ getGvarFilename(evt.images.sat_number, evt.timeReadable, "ALL") + ".png").c_str());
         }
 
-        previewImage.save_png(std::string(evt.directory + "/preview.png").c_str());
 
         //calibrated temperature measurement based on NOAA LUTs (https://www.ospo.noaa.gov/Operations/GOES/calibration/gvar-conversion.html)
         if (evt.images.image1.width() == 5206 || evt.images.image1.width() == 5209)
@@ -155,7 +168,7 @@ private:
                 std::array<std::array<float, 1024>, 4> LUTs = readLUTValues(input);
                 input.close();
 
-                std::ofstream output(evt.directory + "/temperatures.txt");
+                std::ofstream output(evt.directory + "/" + getGvarFilename(evt.images.sat_number, evt.timeReadable, "temp")+".txt");
                 logger->info("Temperatures... temperatures.txt");
                 std::array<image::Image<uint16_t>, 4> channels = {cropIR(evt.images.image1), cropIR(evt.images.image2), cropIR(evt.images.image3), cropIR(evt.images.image4)};
 
@@ -220,15 +233,15 @@ private:
         //mapped crops of europe. IR and VIS
         image::Image<uint16_t> mapProj = cropIR(evt.images.image3);
         drawMapOverlay(evt.images.sat_number, evt.timeUTC, mapProj);
-        mapProj.crop(500, 50, 500 + 1560, 50 + 890);
-        logger->info("Europe IR crop.. europe_IR.png");
-        mapProj.to8bits().save_png(std::string(evt.directory + "/europe_IR.png").c_str());
+        mapProj.crop(300, 3000, 300 + 1500, 3000+ 1300);
+        logger->info("IR crop.. " + getGvarFilename(evt.images.sat_number, evt.timeReadable, "cropIR") + ".png");
+        mapProj.to8bits().save_png(std::string(evt.directory + "/" + getGvarFilename(evt.images.sat_number, evt.timeReadable, "cropIR") + ".png").c_str());
 
         mapProj = cropVIS(evt.images.image5);
         drawMapOverlay(evt.images.sat_number, evt.timeUTC, mapProj);
         mapProj.crop(1348, 240, 1348 + 5928, 240 + 4120);
-        logger->info("Europe VIS crop.. europe_VIS.png");
-        mapProj.to8bits().save_png(std::string(evt.directory + "/europe_VIS.png").c_str());
+        logger->info("VIS crop.. " + getGvarFilename(evt.images.sat_number, evt.timeReadable, "cropVIS") + ".png");
+        mapProj.to8bits().save_png(std::string(evt.directory + "/" + getGvarFilename(evt.images.sat_number, evt.timeReadable, "cropVIS") + ".png").c_str());
         mapProj.clear();
     }
 
@@ -236,13 +249,13 @@ private:
     {
         if (evt.sat_number == 13)
         {
-            logger->info("Europe crop... europe.png");
+            logger->info("crop... " + getGvarFilename(evt.sat_number, evt.timeReadable, "cropFC") + ".png");
             image::Image<uint8_t> crop = evt.false_color_image;
             if (crop.width() == 20836)
                 crop.crop(3198, 240, 3198 + 5928, 240 + 4120);
             else
                 crop.crop(1348, 240, 1348 + 5928, 240 + 4120);
-            crop.save_png(std::string(evt.directory + "/europe.png").c_str());
+            crop.save_png(std::string(evt.directory + "/"+ getGvarFilename(evt.sat_number, evt.timeReadable, "cropFC") + ".png").c_str());
         }
     }
 
@@ -299,6 +312,7 @@ private:
         else
         {
             logger->warn("Wrong IR image size (" + std::to_string(input.width()) + "), it will not be cropped");
+            return input;
         }
         return output;
     }
@@ -317,6 +331,7 @@ private:
         else
         {
             logger->warn("Wrong VIS image size (" + std::to_string(input.width()) + "), it will not be cropped");
+            return input;
         }
         return output;
     }
