@@ -13,6 +13,34 @@
 #include "common/map/map_drawer.h"
 
 #define FIXED_FLOAT(x) std::fixed << std::setprecision(3) << (x)
+struct  crop_t
+{
+    float x1;           //Top left corner of image crop
+    float y1;
+    float x2;           //Lower right corner of image crop
+    float y2;
+    std::string name;   //File name for crop, unused for composite
+    std::string channel;//Channel for source image
+    bool include_map;   //Should map be overlayed
+    bool include_date;  //Should file name include date/time
+};
+
+struct images_t
+{
+    crop_t crop;    //Source image info
+    uint16_t x;     //Final section location on composite
+    uint16_t y;
+    uint16_t width; //Final section width & height
+    uint16_t height;
+};
+struct composite_t
+{
+    std::string name;   //File name for composite
+    bool include_date;  //Should file name include date/time
+    uint16_t width;     //Final composite width & height
+    uint16_t height;
+    std::vector<images_t> images;
+};
 
 geodetic::projection::GEOSProjection proj_geos;
 
@@ -21,10 +49,18 @@ class GVARExtended : public satdump::Plugin
 private:
     static std::string misc_preview_text;
     static std::vector<std::array<float, 3>> points;
+    static std::vector<crop_t> crops;
+    static std::vector<composite_t> composites;
+
     static std::vector<std::string> names;
 
     static void satdumpStartedHandler(const satdump::SatDumpStartedEvent &)
     {
+        crops.clear();
+        composites.clear();
+        points.clear();
+
+
         if (global_cfg.contains("gvar_extended"))
         {
             if (global_cfg["gvar_extended"].contains("preview_misc_text"))
@@ -32,6 +68,81 @@ private:
             else
                 misc_preview_text = "SatDump | GVAR";
 
+            if (global_cfg["gvar_extended"].contains("crop"))
+            {
+                for (int i = 0; i < (int)global_cfg["gvar_extended"]["crop"].size(); i++)
+                {
+                    float x1,x2,y1,y2;
+                    std::string name,layer;
+                    bool map,date;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("x1")) x1=global_cfg["gvar_extended"]["crop"][i]["x1"].get<float>(); else x1=0;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("y1")) y1=global_cfg["gvar_extended"]["crop"][i]["y1"].get<float>(); else y1=0;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("x2")) x2=global_cfg["gvar_extended"]["crop"][i]["x2"].get<float>(); else x2=1;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("y2")) y2=global_cfg["gvar_extended"]["crop"][i]["y2"].get<float>(); else y2=1;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("layer")) layer=global_cfg["gvar_extended"]["crop"][i]["layer"].get<std::string>(); else continue;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("name")) name=global_cfg["gvar_extended"]["crop"][i]["name"].get<std::string>(); else continue;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("map_overlay")) map=global_cfg["gvar_extended"]["crop"][i]["map_overlay"].get<bool>(); else map=false;
+                    if(global_cfg["gvar_extended"]["crop"][i].contains("date_in_name")) date=global_cfg["gvar_extended"]["crop"][i]["date_in_name"].get<bool>(); else date=false;
+
+                    crops.push_back({x1,y1,x2,y2,name,layer,map,date});
+                }
+            }
+            else
+            {//No crops defined, load defaults
+                    crops.push_back({500, 50, 500 + 1560, 50 + 890,"europe_IR","4",true,false});
+                    crops.push_back({1348, 240, 1348 + 5928, 240 + 4120,"europe_VIS","1",true,false});
+                    crops.push_back({1348, 240, 1348 + 5928, 240 + 4120,"europe","FC",false,false});
+            }
+            
+            if (global_cfg["gvar_extended"].contains("composite"))
+            {
+                for (int comp = 0; comp < (int)global_cfg["gvar_extended"]["composite"].size(); comp++)
+                {
+                    std::vector<images_t> images;
+                    std::string name;
+                    bool date;
+                    uint16_t width,height;
+                    if(global_cfg["gvar_extended"]["composite"][comp].contains("name")) name=global_cfg["gvar_extended"]["composite"][comp]["name"].get<std::string>(); else continue;
+                    if(global_cfg["gvar_extended"]["composite"][comp].contains("date_in_name")) date=global_cfg["gvar_extended"]["composite"][comp]["date_in_name"].get<bool>(); else date=false;
+                    if(global_cfg["gvar_extended"]["composite"][comp].contains("width")) width=global_cfg["gvar_extended"]["composite"][comp]["width"].get<float>(); else continue;
+                    if(global_cfg["gvar_extended"]["composite"][comp].contains("height")) height=global_cfg["gvar_extended"]["composite"][comp]["height"].get<float>(); else continue;
+
+                    for ( int image =0; image < (int)global_cfg["gvar_extended"]["composite"][comp]["images"].size();image++)
+                    {
+                        float x1,x2,y1,y2;
+                        uint16_t x,y,width2,height2;
+                        std::string layer;
+                        bool map;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"].contains("x1")) x1=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"]["x1"].get<float>(); else x1=0;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"].contains("y1")) y1=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"]["y1"].get<float>(); else y1=0;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"].contains("x2")) x2=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"]["x2"].get<float>(); else x2=1;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"].contains("y2")) y2=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["crop"]["y2"].get<float>(); else y2=1;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image].contains("layer")) layer=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["layer"].get<std::string>(); else continue;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image].contains("map_overlay")) map=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["map_overlay"].get<bool>(); else map=false;
+
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image].contains("x")) x=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["x"].get<u_int16_t>(); else continue;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image].contains("y")) y=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["y"].get<u_int16_t>(); else continue;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image].contains("width")) width2=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["width"].get<u_int16_t>(); else continue;
+                        if(global_cfg["gvar_extended"]["composite"][comp]["images"][image].contains("height")) height2=global_cfg["gvar_extended"]["composite"][comp]["images"][image]["height"].get<u_int16_t>(); else continue;
+                        images_t imageObj={{x1,y1,x2,y2,"",layer,map,false},x,y,width2,height2};
+
+                        images.push_back(imageObj);
+                    }
+                    composites.push_back({name,date,width, height,images});
+                }
+            }
+            else
+            {//No preview defined, load default
+
+                composites.push_back({"preview",false,1300, 948,{
+                    {{0,0,1,1,"","1",false,false},   0,  0,1040, 948},
+                    {{0,0,1,1,"","2",false,false},1040,  0, 260, 237},
+                    {{0,0,1,1,"","3",false,false},1040,237, 260, 237},
+                    {{0,0,1,1,"","4",false,false},1040,474, 260, 237},
+                    {{0,0,1,1,"","5",false,false},1040,711, 260, 237},
+                }});
+            }
+            
             if (global_cfg["gvar_extended"].contains("temperature_points"))
             {
                 points.clear();
@@ -46,95 +157,106 @@ private:
         }
     }
 
+    static std::string getGvarFilename(int sat_number, std::tm *timeReadable, std::string channel)
+    {
+        std::string utc_filename = "G" + std::to_string(sat_number) + "_" + channel + "_" +                                                                     // Satellite name and channel
+                                    std::to_string(timeReadable->tm_year + 1900) +                                                                               // Year yyyy
+                                    (timeReadable->tm_mon + 1 > 9 ? std::to_string(timeReadable->tm_mon + 1) : "0" + std::to_string(timeReadable->tm_mon + 1)) + // Month MM
+                                    (timeReadable->tm_mday > 9 ? std::to_string(timeReadable->tm_mday) : "0" + std::to_string(timeReadable->tm_mday)) + "T" +    // Day dd
+                                    (timeReadable->tm_hour > 9 ? std::to_string(timeReadable->tm_hour) : "0" + std::to_string(timeReadable->tm_hour)) +          // Hour HH
+                                    (timeReadable->tm_min > 9 ? std::to_string(timeReadable->tm_min) : "0" + std::to_string(timeReadable->tm_min)) +             // Minutes mm
+                                    (timeReadable->tm_sec > 9 ? std::to_string(timeReadable->tm_sec) : "0" + std::to_string(timeReadable->tm_sec)) + "Z";        // Seconds ss
+        return utc_filename;
+    }
     static void gvarSaveChannelImagesHandler(const goes::gvar::events::GVARSaveChannelImagesEvent &evt)
     {
-        logger->info("Preview... preview.png");
-        image::Image<uint8_t> preview(1300, 948, 1);
-        image::Image<uint8_t> previewImage;
-
-        // Preview generation
+        
+        for(int i=0;i<composites.size();i++)
         {
-            image::Image<uint8_t> channel1_8bit(1040, 948, 1);
-            image::Image<uint8_t> channel2_8bit(260, 237, 1);
-            image::Image<uint8_t> channel3_8bit(260, 237, 1);
-            image::Image<uint8_t> channel4_8bit(260, 237, 1);
-            image::Image<uint8_t> channel5_8bit(260, 237, 1);
+            composite_t comp = composites[i];
 
-            image::Image<uint16_t> resized5 = evt.images.image5;
-            resized5.resize(1040, 948);
+            logger->info("Preview... " + comp.name +".png");
+            image::Image<uint8_t> preview(comp.width, comp.height, 1);
+            image::Image<uint8_t> previewImage;
 
-            for (int i = 0; i < (int)channel1_8bit.size(); i++)
+            // Preview generation
+            for(int sub=0;sub<comp.images.size();sub++)
             {
-                channel1_8bit[i] = resized5[i] / 256;
+                images_t subImage=comp.images[sub];
+
+                image::Image<uint8_t> channel_8bit(subImage.width, subImage.height, 1);
+
+                image::Image<uint16_t> resized;
+                if     (subImage.crop.channel=="1") resized = cropVIS(evt.images.image5);
+                else if(subImage.crop.channel=="2") resized = cropIR(evt.images.image1);
+                else if(subImage.crop.channel=="3") resized = cropIR(evt.images.image2);
+                else if(subImage.crop.channel=="4") resized = cropIR(evt.images.image3);
+                else if(subImage.crop.channel=="5") resized = cropIR(evt.images.image4);
+                else continue;
+                
+                resized.resize(subImage.width/(subImage.crop.x2-subImage.crop.x1), subImage.height/(subImage.crop.y2-subImage.crop.y1));
+
+                //Map?
+                if(subImage.crop.include_map) drawMapOverlay(evt.images.sat_number, evt.timeUTC, resized);
+
+                //Crop if required
+                if(subImage.crop.x1!=0 || subImage.crop.y1!=0 || subImage.crop.x2!=1 || subImage.crop.y2!=1)
+                {//Crop configured.
+                    if(subImage.crop.x1>1 || subImage.crop.y1>1 || subImage.crop.x2>1 || subImage.crop.y2>1)
+                        //Crop set by pixels
+                        resized.crop(subImage.crop.x1, subImage.crop.y1, subImage.crop.x2, subImage.crop.y2);
+                    else
+                        //Crop set by percentages
+                        resized.crop(resized.width()*subImage.crop.x1, resized.height()*subImage.crop.y1, resized.width()*subImage.crop.x2, resized.height()*subImage.crop.y2);
+                }
+
+
+                for (int i = 0; i < (int)channel_8bit.size(); i++)
+                {
+                    channel_8bit[i] = resized[i] >> 8;//Divide by 256. Shift = faster?
+                }
+                
+                channel_8bit.simple_despeckle();
+
+                preview.draw_image(0, channel_8bit, subImage.x, subImage.y);
             }
 
-            image::Image<uint16_t> buff2 = evt.images.image1,
-                                               buff3 = evt.images.image2,
-                                               buff4 = evt.images.image3,
-                                               buff5 = evt.images.image4;
-
-            buff2.resize(260, 237);
-            buff3.resize(260, 237);
-            buff4.resize(260, 237);
-            buff5.resize(260, 237);
-
-            for (int i = 0; i < (int)channel2_8bit.size(); i++)
+            // Overlay the preview
             {
-                channel2_8bit[i] = buff2[i] / 256;
-                channel3_8bit[i] = buff3[i] / 256;
-                channel4_8bit[i] = buff4[i] / 256;
-                channel5_8bit[i] = buff5[i] / 256;
+                std::string sat_name = evt.images.sat_number == 13 ? "EWS-G1 / GOES-13" : ("GOES-" + std::to_string(evt.images.sat_number));
+                std::string date_time = (evt.timeReadable->tm_mday > 9 ? std::to_string(evt.timeReadable->tm_mday) : "0" + std::to_string(evt.timeReadable->tm_mday)) + '/' +
+                                        (evt.timeReadable->tm_mon + 1 > 9 ? std::to_string(evt.timeReadable->tm_mon + 1) : "0" + std::to_string(evt.timeReadable->tm_mon + 1)) + '/' +
+                                        std::to_string(evt.timeReadable->tm_year + 1900) + ' ' +
+                                        (evt.timeReadable->tm_hour > 9 ? std::to_string(evt.timeReadable->tm_hour) : "0" + std::to_string(evt.timeReadable->tm_hour)) + ':' +
+                                        (evt.timeReadable->tm_min > 9 ? std::to_string(evt.timeReadable->tm_min) : "0" + std::to_string(evt.timeReadable->tm_min)) + " UTC";
+
+                int offsetX, offsetY, bar_height;
+
+                //set ratios for calculating bar size
+                float bar_ratio = 0.02;
+
+
+                bar_height = preview.width() * bar_ratio;
+                offsetX = 5; //preview.width() * offsetXratio;
+                offsetY = 1; //preview.width() * offsetYratio;
+
+                unsigned char color = 255;
+
+                image::Image<uint8_t> imgtext = image::generate_text_image(sat_name.c_str(), &color, bar_height, offsetX, offsetY); 
+                image::Image<uint8_t>imgtext1 = image::generate_text_image(date_time.c_str(), &color, bar_height, offsetX, offsetY); 
+                image::Image<uint8_t>imgtext2 = image::generate_text_image(misc_preview_text.c_str(), &color, bar_height, offsetX, offsetY); 
+
+                previewImage = image::Image<uint8_t>(preview.width(), preview.height() + 2 * bar_height, 1);
+                previewImage.fill(0);
+
+                previewImage.draw_image(0, imgtext, 0, 0);
+                previewImage.draw_image(0, imgtext1, previewImage.width() - imgtext1.width(), 0);
+                previewImage.draw_image(0, imgtext2, 0, bar_height + preview.height());
+                previewImage.draw_image(0, preview, 0, bar_height);
             }
-            
-            channel1_8bit.simple_despeckle();
-            channel2_8bit.simple_despeckle();
-            channel3_8bit.simple_despeckle();
-            channel4_8bit.simple_despeckle();
-            channel5_8bit.simple_despeckle();
-            
 
-            preview.draw_image(0, channel1_8bit, 0, 0);
-            preview.draw_image(0, channel2_8bit, 1040, 0);
-            preview.draw_image(0, channel3_8bit, 1040, 237);
-            preview.draw_image(0, channel4_8bit, 1040, 474);
-            preview.draw_image(0, channel5_8bit, 1040, 711);
+            previewImage.save_png(std::string(evt.directory + "/" + comp.name +".png").c_str());
         }
-
-        // Overlay the preview
-        {
-            std::string sat_name = evt.images.sat_number == 13 ? "EWS-G1 / GOES-13" : ("GOES-" + std::to_string(evt.images.sat_number));
-            std::string date_time = (evt.timeReadable->tm_mday > 9 ? std::to_string(evt.timeReadable->tm_mday) : "0" + std::to_string(evt.timeReadable->tm_mday)) + '/' +
-                                    (evt.timeReadable->tm_mon + 1 > 9 ? std::to_string(evt.timeReadable->tm_mon + 1) : "0" + std::to_string(evt.timeReadable->tm_mon + 1)) + '/' +
-                                    std::to_string(evt.timeReadable->tm_year + 1900) + ' ' +
-                                    (evt.timeReadable->tm_hour > 9 ? std::to_string(evt.timeReadable->tm_hour) : "0" + std::to_string(evt.timeReadable->tm_hour)) + ':' +
-                                    (evt.timeReadable->tm_min > 9 ? std::to_string(evt.timeReadable->tm_min) : "0" + std::to_string(evt.timeReadable->tm_min)) + " UTC";
-
-            int offsetX, offsetY, bar_height;
-
-            //set ratios for calculating bar size
-            float bar_ratio = 0.02;
-
-
-            bar_height = preview.width() * bar_ratio;
-            offsetX = 5; //preview.width() * offsetXratio;
-            offsetY = 1; //preview.width() * offsetYratio;
-
-            unsigned char color = 255;
-
-            image::Image<uint8_t> imgtext = image::generate_text_image(sat_name.c_str(), &color, bar_height, offsetX, offsetY); 
-            image::Image<uint8_t>imgtext1 = image::generate_text_image(date_time.c_str(), &color, bar_height, offsetX, offsetY); 
-            image::Image<uint8_t>imgtext2 = image::generate_text_image(misc_preview_text.c_str(), &color, bar_height, offsetX, offsetY); 
-
-            previewImage = image::Image<uint8_t>(preview.width(), preview.height() + 2 * bar_height, 1);
-            previewImage.fill(0);
-
-            previewImage.draw_image(0, imgtext, 0, 0);
-            previewImage.draw_image(0, imgtext1, previewImage.width() - imgtext1.width(), 0);
-            previewImage.draw_image(0, imgtext2, 0, bar_height + preview.height());
-            previewImage.draw_image(0, preview, 0, bar_height);
-        }
-
-        previewImage.save_png(std::string(evt.directory + "/preview.png").c_str());
 
         //calibrated temperature measurement based on NOAA LUTs (https://www.ospo.noaa.gov/Operations/GOES/calibration/gvar-conversion.html)
         if (evt.images.image1.width() == 5206 || evt.images.image1.width() == 5209)
@@ -214,31 +336,58 @@ private:
 
         logger->info("Generating mapped crops..");
         //mapped crops of europe. IR and VIS
-        image::Image<uint16_t> mapProj = cropIR(evt.images.image3);
-        drawMapOverlay(evt.images.sat_number, evt.timeUTC, mapProj);
-        mapProj.crop(500, 50, 500 + 1560, 50 + 890);
-        logger->info("Europe IR crop.. europe_IR.png");
-        mapProj.to8bits().save_png(std::string(evt.directory + "/europe_IR.png").c_str());
+        for (int j = 0; j < (int)crops.size(); j++)
+        {
+            std::string filename;
+            if(crops[j].include_date) filename = getGvarFilename(evt.images.sat_number,evt.timeReadable,crops[j].channel)+"_"; else filename="";
+            image::Image<uint16_t> mapProj;
+            if(crops[j].channel=="1") mapProj = cropVIS(evt.images.image5);
+            else if(crops[j].channel=="2") mapProj = cropIR(evt.images.image1);
+            else if(crops[j].channel=="3") mapProj = cropIR(evt.images.image2);
+            else if(crops[j].channel=="4") mapProj = cropIR(evt.images.image3);
+            else if(crops[j].channel=="5") mapProj = cropIR(evt.images.image4);
+            else continue;
 
-        mapProj = cropVIS(evt.images.image5);
-        drawMapOverlay(evt.images.sat_number, evt.timeUTC, mapProj);
-        mapProj.crop(1348, 240, 1348 + 5928, 240 + 4120);
-        logger->info("Europe VIS crop.. europe_VIS.png");
-        mapProj.to8bits().save_png(std::string(evt.directory + "/europe_VIS.png").c_str());
-        mapProj.clear();
+            if(crops[j].include_map) drawMapOverlay(evt.images.sat_number, evt.timeUTC, mapProj);
+            
+            if(crops[j].x1>1 || crops[j].y1>1 || crops[j].x2>1 || crops[j].y2>1)
+                //Crop set by pixels
+                mapProj.crop(crops[j].x1, crops[j].y1, crops[j].x2, crops[j].y2);
+            else
+                //Crop set by percentages
+                mapProj.crop(mapProj.width()*crops[j].x1, mapProj.height()*crops[j].y1, mapProj.width()*crops[j].x2, mapProj.height()*crops[j].y2);
+            
+            logger->info((std::string)((crops[j].channel=="1")?"VIS":"IR") + " crop.. " + filename + crops[j].name + ".png");
+            mapProj.to8bits().save_png(std::string(evt.directory + "/" + filename + crops[j].name + ".png").c_str());
+
+            mapProj.clear();
+        }
     }
 
-    static void gvarSaveFalceColorHandler(const goes::gvar::events::GVARSaveFCImageEvent &evt)
+    static void gvarSaveFalseColorHandler(const goes::gvar::events::GVARSaveFCImageEvent &evt)
     {
         if (evt.sat_number == 13)
         {
-            logger->info("Europe crop... europe.png");
-            image::Image<uint8_t> crop = evt.false_color_image;
-            if (crop.width() == 20836)
-                crop.crop(3198, 240, 3198 + 5928, 240 + 4120);
-            else
-                crop.crop(1348, 240, 1348 + 5928, 240 + 4120);
-            crop.save_png(std::string(evt.directory + "/europe.png").c_str());
+            for (int j = 0; j < (int)crops.size(); j++)
+            {
+                if(crops[j].channel=="FC")
+                {
+                    std::string filename;
+                    if(crops[j].include_date) filename = getGvarFilename(evt.sat_number,evt.timeReadable,crops[j].channel)+"_"; else filename="";
+                    logger->info("crop... " + filename + crops[j].name + ".png");
+                    image::Image<uint8_t> crop = cropFC(evt.false_color_image);
+                    if(crops[j].include_map) drawMapOverlay(evt.sat_number, evt.timeUTC, crop);
+
+                    if(crops[j].x1>1 || crops[j].y1>1 || crops[j].x2>1 || crops[j].y2>1)
+                        //Crop set by pixels
+                        crop.crop(crops[j].x1, crops[j].y1, crops[j].x2, crops[j].y2);
+                    else
+                        //Crop set by percentages
+                        crop.crop(crop.width()*crops[j].x1, crop.height()*crops[j].y1, crop.width()*crops[j].x2, crop.height()*crops[j].y2);
+
+                    crop.save_png(std::string(evt.directory + "/"+ filename +crops[j].name + ".png").c_str());
+                }
+            }
         }
     }
 
@@ -295,6 +444,7 @@ private:
         else
         {
             logger->warn("Wrong IR image size (" + std::to_string(input.width()) + "), it will not be cropped");
+            return input;
         }
         return output;
     }
@@ -313,6 +463,25 @@ private:
         else
         {
             logger->warn("Wrong VIS image size (" + std::to_string(input.width()) + "), it will not be cropped");
+            return input;
+        }
+        return output;
+    }
+    static image::Image<uint8_t> cropFC(image::Image<uint8_t> input)
+    {
+        image::Image<uint8_t> output(18990, input.height(), 3);
+        if (input.width() == 20824)
+        {
+            output.draw_image(0, input, 0, 0);
+        }
+        else if (input.width() == 20836)
+        {
+            output.draw_image(0, input, -1852, 0);
+        }
+        else
+        {
+            logger->warn("Wrong FC image size (" + std::to_string(input.width()) + "), it will not be cropped");
+            return input;
         }
         return output;
     }
@@ -368,6 +537,34 @@ private:
                                        });
 
     }
+    static void drawMapOverlay(int number, time_t time, image::Image<uint8_t> &image)
+    {
+        geodetic::projection::GEOProjector proj(61.5, 35782.466981, 18990, 18956, 1.1737, 1.1753, 0, -40, 1);
+
+        uint8_t color[3] = {255, 255, 255};
+
+        map::drawProjectedMapShapefile({resources::getResourcePath("maps/ne_10m_admin_0_countries.shp")}, image, color, [&proj, &image](float lat, float lon, int map_height, int map_width) -> std::pair<int, int>
+                                       {
+                                           int image_x, image_y;
+                                           proj.forward(lon, lat, image_x, image_y);
+                                           if (image.width() == 18990)
+                                           {
+                                               return {image_x, image_y};
+                                           }
+                                           else
+                                           {
+                                               if (image_x == -1 && image_y == -1)
+                                               {
+                                                   return {-1, -1};
+                                               }
+                                               else
+                                               {
+                                                   return {image_x / 4, image_y / 4};
+                                               }
+                                           }
+                                       });
+
+    }
 
 
 public:
@@ -380,12 +577,14 @@ public:
     {
         satdump::eventBus->register_handler<satdump::SatDumpStartedEvent>(satdumpStartedHandler);
         satdump::eventBus->register_handler<goes::gvar::events::GVARSaveChannelImagesEvent>(gvarSaveChannelImagesHandler);
-        satdump::eventBus->register_handler<goes::gvar::events::GVARSaveFCImageEvent>(gvarSaveFalceColorHandler);
+        satdump::eventBus->register_handler<goes::gvar::events::GVARSaveFCImageEvent>(gvarSaveFalseColorHandler);
     }
 };
 
 std::string GVARExtended::misc_preview_text = "SatDump | GVAR";
 std::vector<std::array<float, 3>> GVARExtended::points = {{}};
 std::vector<std::string> GVARExtended::names = {};
+std::vector<crop_t> GVARExtended::crops = {};
+std::vector<composite_t> GVARExtended::composites = {};
 
 PLUGIN_LOADER(GVARExtended)
