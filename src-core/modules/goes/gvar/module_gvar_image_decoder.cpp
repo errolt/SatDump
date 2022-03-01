@@ -105,7 +105,7 @@ namespace goes
             images.image2.crop(0, 0, ir1_width, ir1_height);
             images.image3.crop(0, 0, ir1_width, ir1_height);
             images.image4.crop(0, 0, ir1_width, ir1_height);
-/*
+
             logger->info("Channel 1... " + getGvarFilename(sat_number, timeReadable, "1") + ".png");
             images.image5.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "1") + ".png").c_str(), false);
 
@@ -120,7 +120,7 @@ namespace goes
 
             logger->info("Channel 5... " + getGvarFilename(sat_number, timeReadable, "5") + ".png");
             images.image4.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "5") + ".png").c_str());
-*/
+
             // Let plugins do something
             satdump::eventBus->fire_event<events::GVARSaveChannelImagesEvent>({images, timeReadable, timevalue, disk_folder});
 
@@ -178,7 +178,7 @@ namespace goes
                 image::hue_saturation(compoImage, hueTuning);
 
                 logger->info("False color... " + getGvarFilename(sat_number, timeReadable, "FC") + ".png");
-//                compoImage.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "FC") + ".png").c_str());
+                compoImage.save_png(std::string(disk_folder + "/" + getGvarFilename(sat_number, timeReadable, "FC") + ".png").c_str());
 
                 // Let plugins do something
                 satdump::eventBus->fire_event<events::GVARSaveFCImageEvent>({compoImage, images.sat_number, timeReadable, timevalue, disk_folder});
